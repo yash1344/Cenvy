@@ -12,7 +12,7 @@ _last_clipboard_hash = None
 
 supabase = SupabaseUploader(
     url="https://uwgqchqhoapudghqyxlb.supabase.co",
-    key="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV3Z3FjaHFob2FwdWRnaHF5eGxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA1Njk0OTUsImV4cCI6MjA3NjE0NTQ5NX0.gPEWKEoXc3SuzQc6M4yRRlITvYSoHiSTzpd3OK4Ggwc",
+    key="sb_secret_ZfsWQaPxoPWozqxpNM24ZA_Tb_o0ZcX",
     bucket_name="clipboard_files"
 )
 

@@ -9,13 +9,19 @@ class SupabaseUploader:
     def upload_file(self, file_path: str):
         """Uploads a file to Supabase Storage and returns its public URL."""
         file_name = os.path.basename(file_path)
-        with open(file_path, "rb") as f:
-            res = self.client.storage.from_(self.bucket_name).upload(file_name, f)
-        
-        if res.status_code in [200, 201]:
-            # Generate public URL
+        # Check file size limit 50MB
+        if os.path.getsize(file_path) > 50 * 1024 * 1024:
+            print(f"File {file_name} exceeds size limit.")
+            return None
+
+        try:
+            # Correct: pass upsert as keyword argument
+            with open(file_path, "rb") as f:
+                self.client.storage.from_(self.bucket_name).upload(file_name, f)
+
+            # Get public URL
             public_url = self.client.storage.from_(self.bucket_name).get_public_url(file_name)
             return public_url
-        else:
-            print("Upload failed:", res)
+        except Exception as e:
+            print(f"Upload failed for {file_path}: {e}")
             return None
