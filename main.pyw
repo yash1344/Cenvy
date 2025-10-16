@@ -4,9 +4,17 @@ from PIL import Image
 import hashlib
 from FirebaseRealtimeDB import FirebaseRealtimeDB
 import threading
-import base64, io
+import os
+from supabase_uploader import SupabaseUploader
 
 _last_clipboard_hash = None
+
+
+supabase = SupabaseUploader(
+    url="https://uwgqchqhoapudghqyxlb.supabase.co",
+    key="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV3Z3FjaHFob2FwdWRnaHF5eGxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA1Njk0OTUsImV4cCI6MjA3NjE0NTQ5NX0.gPEWKEoXc3SuzQc6M4yRRlITvYSoHiSTzpd3OK4Ggwc",
+    bucket_name="clipboard_files"
+)
 
 # Initialize Firebase
 firebase = FirebaseRealtimeDB(
@@ -27,28 +35,46 @@ def get_clipboard_hash():
 
 def clipboard_changed():
     global _last_clipboard_hash
-    current_hash = get_clipboard_hash()
-    if current_hash == _last_clipboard_hash:
-        return  # Same content as before, ignore
-    _last_clipboard_hash = current_hash
 
+     # Check for files first
+    files = ClipboardManager.get_files()
+    if files:
+        hash_input = "|".join(files).encode("utf-8")
+        current_hash = hashlib.md5(hash_input).hexdigest()
+        if current_hash == _last_clipboard_hash:
+            return
+        _last_clipboard_hash = current_hash
+
+        print("Copied files:", files)
+        public_links = []
+
+        for path in files:
+            if os.path.isfile(path):
+                try:
+                    url = supabase.upload_file(path)
+                    if url:
+                        print(f"Uploaded {path} → {url}")
+                        public_links.append(url)
+                    else:
+                        print(f"Failed to upload {path}")
+                except Exception as e:
+                    print("Upload error:", e)
+            else:
+                print("Skipping non-file:", path)
+
+        if public_links:
+            firebase.set_latest_clipboard({"type": "files", "data": public_links})
+        return
+
+    # Then check text
     text = ClipboardManager.get_text()
     if text:
+        current_hash = hashlib.md5(text.encode("utf-8")).hexdigest()
+        if current_hash == _last_clipboard_hash:
+            return
+        _last_clipboard_hash = current_hash
         print("Clipboard Text Changed:", text)
         firebase.set_latest_clipboard({"type": "text", "data": text})
-    # Image sync removed
-    # else:
-    #     image = ClipboardManager.get_image()
-    #     if image:
-    #         print("Clipboard Image Changed")
-    #         try:
-    #             buf = io.BytesIO()
-    #             image.save(buf, format="PNG")
-    #             img_b64 = base64.b64encode(buf.getvalue()).decode()
-    #             print("Uploading image to Firebase, base64 size:", len(img_b64))
-    #             firebase.set_latest_clipboard({"type": "image", "data": img_b64})
-    #         except Exception as e:
-    #             print("Error encoding image for Firebase:", e)
 
 
 def on_firebase_update(data):

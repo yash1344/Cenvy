@@ -109,3 +109,16 @@ class ClipboardManager:
             return None
         finally:
             win32clipboard.CloseClipboard()
+
+    @staticmethod
+    def get_files():
+        try:
+            win32clipboard.OpenClipboard()
+            if win32clipboard.IsClipboardFormatAvailable(win32clipboard.CF_HDROP):
+                files = win32clipboard.GetClipboardData(win32clipboard.CF_HDROP)
+                return list(files)
+        except Exception:
+            pass
+        finally:
+            win32clipboard.CloseClipboard()
+        return None
