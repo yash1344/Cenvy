@@ -16,4 +16,4 @@ class FirebaseRealtimeDB:
 
     def listen_latest_clipboard(self, callback):
         ref = db.reference('clipboard')
-        ref.listen(lambda event: callback(event.data))
+        ref.listen(lambda event: callback(event))

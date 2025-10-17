@@ -92,7 +92,10 @@ def clipboard_changed():
         firebase.set_latest_clipboard({"type": "text", "data": text})
 
 
-def on_firebase_update(data):
+def on_firebase_update(event):
+    data = event.data
+    type = event.path
+
     if not data:
         return
     # If we recently uploaded files, the RTDB will send the same update back; skip it once
@@ -100,15 +103,15 @@ def on_firebase_update(data):
         print("Ignoring Firebase update caused by our own upload.")
         FILE_UPLOAD_IGNORE.clear()
         return
+    
     # Compare with current clipboard to avoid duplication
-    # if isinstance(data, str):
-    #     print("Firebase sent plain string...................................................")
-    #     current_text = ClipboardManager.get_text()
-    #     if current_text == data:
-    #         print("Firebase text matches clipboard, skipping update.")
-    #         return
-    #     ClipboardManager.set_text(data)
-    #     return
+    if type == "/data" and isinstance(data, str):
+        current_text = ClipboardManager.get_text()
+        if current_text == data:
+            print("Firebase text matches clipboard, skipping update.")
+            return
+        ClipboardManager.set_text(data)
+        return
     if isinstance(data, dict) and data.get("type") == "text":
         current_text = ClipboardManager.get_text()
         if current_text == data["data"]:
