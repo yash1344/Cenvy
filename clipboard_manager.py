@@ -6,6 +6,7 @@ import io
 import time
 import threading
 import struct
+import os
 
 
 MAX_CLIPBOARD_SIZE = 1024 * 1024  # 1 MB
@@ -128,19 +129,29 @@ class ClipboardManager:
     #provided file paths in argument "file_paths" will be Cut or Copied to clipboard
     @staticmethod
     def set_clipboard_files(file_paths, cut=False):
-        """Place file paths into clipboard (cut or copy)."""
+        """Copy or cut multiple files to Windows clipboard."""
+        if isinstance(file_paths, str):
+            file_paths = [file_paths]
+
+        # Convert to absolute paths and filter out non-existing files
+        abs_paths = [os.path.abspath(f) for f in file_paths if os.path.exists(f)]
+        if not abs_paths:
+            return
+
         # CF_HDROP requires double-null terminated string
-        files_str = "\0".join(file_paths) + "\0\0"
+        files_str = "\0".join(abs_paths) + "\0\0"
+        print(f"[DEBUG] CF_HDROP string: {files_str}")
         data = files_str.encode("utf-16le")
 
-        win32clipboard.OpenClipboard()
-        win32clipboard.EmptyClipboard()
-        win32clipboard.SetClipboardData(win32con.CF_HDROP, data)
+        # DropEffect: 1 = copy, 2 = move (cut)
+        drop_effect = struct.pack("I", 2 if cut else 1)
 
-        # Add "Preferred DropEffect" — tells Windows if it's a Cut or Copy
-        drop_effect = struct.pack("I", 2 if cut else 1)  # 2=cut, 1=copy
-        win32clipboard.SetClipboardData(win32clipboard.RegisterClipboardFormat("Preferred DropEffect"), drop_effect)
+        try:
+            win32clipboard.OpenClipboard()
+            win32clipboard.EmptyClipboard()
+            win32clipboard.SetClipboardData(win32con.CF_HDROP, data)
 
-        win32clipboard.CloseClipboard()
-
-        print(f"Clipboard set with {len(file_paths)} files ({'cut' if cut else 'copy'})")
+            format_id = win32clipboard.RegisterClipboardFormat("Preferred DropEffect")
+            win32clipboard.SetClipboardData(format_id, drop_effect)
+        finally:
+            win32clipboard.CloseClipboard()

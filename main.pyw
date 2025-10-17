@@ -132,7 +132,7 @@ def on_firebase_update(event):
 
         if local_paths:
             FILE_DOWNLOAD_IGNORE.set()
-            ClipboardManager.set_clipboard_files(local_paths, cut=True)
+            ClipboardManager.set_clipboard_files(local_paths, cut=False)
 
 if __name__ == "__main__":
     manager = ClipboardManager()
