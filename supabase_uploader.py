@@ -25,3 +25,12 @@ class SupabaseUploader:
         except Exception as e:
             print(f"Upload failed for {file_path}: {e}")
             return None
+        
+    #clear whole bucket (delete all available files)
+    def clear_bucket(self):
+        try:
+            files = self.client.storage.from_(self.bucket_name).list()
+            for file in files:
+                self.client.storage.from_(self.bucket_name).remove([file['name']])
+        except Exception as e:
+            print(f"Failed to clear bucket: {e}")

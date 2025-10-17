@@ -48,6 +48,7 @@ def clipboard_changed():
         print("Copied files:", files)
         public_links = []
 
+        supabase.clear_bucket()  # Clear bucket before uploading new files
         for path in files:
             if os.path.isfile(path):
                 try:
