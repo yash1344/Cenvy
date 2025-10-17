@@ -1,17 +1,20 @@
 from clipboard_manager import ClipboardManager
 from clipboard_listener import ClipboardListener
-from PIL import Image
 import hashlib
 from FirebaseRealtimeDB import FirebaseRealtimeDB
 import threading
 import os
 import supabaseSecrets
-from supabase_uploader import SupabaseUploader
+from supabase_manager import SupabaseManager
+import tempfile
+
+
+TEMP_DIR = os.path.join(tempfile.gettempdir(), "Cenvy Share")
+os.makedirs(TEMP_DIR, exist_ok=True)
 
 _last_clipboard_hash = None
 
-
-supabase = SupabaseUploader(
+supabase = SupabaseManager(
     url=supabaseSecrets.url,
     key=supabaseSecrets.key,
     bucket_name="clipboard_files"
@@ -22,6 +25,9 @@ firebase = FirebaseRealtimeDB(
     cred_path="cenvy-7117b-firebase-adminsdk-fbsvc-13b64f68ec.json",  # <-- Your credentials file
     db_url="https://cenvy-7117b-default-rtdb.firebaseio.com/"  # <-- Your DB URL
 )
+
+FILE_UPLOAD_IGNORE = threading.Event()  # To prevent self-triggering on uploads
+FILE_DOWNLOAD_IGNORE = threading.Event()  # To prevent self-triggering on downloads
 
 def get_clipboard_hash():
     text = ClipboardManager.get_text()
@@ -36,6 +42,11 @@ def get_clipboard_hash():
 
 def clipboard_changed():
     global _last_clipboard_hash
+
+    if FILE_DOWNLOAD_IGNORE.is_set():
+        print("Ignoring clipboard change caused by our own download.")
+        FILE_DOWNLOAD_IGNORE.clear()
+        return
 
      # Check for files first
     files = ClipboardManager.get_files()
@@ -65,6 +76,8 @@ def clipboard_changed():
                 print("Skipping non-file:", path)
 
         if public_links:
+            # Signal that the next Firebase update(s) were created by our upload
+            FILE_UPLOAD_IGNORE.set()
             firebase.set_latest_clipboard({"type": "files", "data": public_links})
         return
 
@@ -82,43 +95,41 @@ def clipboard_changed():
 def on_firebase_update(data):
     if not data:
         return
-    # Compare with current clipboard to avoid duplication
-    if isinstance(data, str):
-        current_text = ClipboardManager.get_text()
-        if current_text == data:
-            print("Firebase text matches clipboard, skipping update.")
-            return
-        ClipboardManager.set_text(data)
+    # If we recently uploaded files, the RTDB will send the same update back; skip it once
+    if FILE_UPLOAD_IGNORE.is_set():
+        print("Ignoring Firebase update caused by our own upload.")
+        FILE_UPLOAD_IGNORE.clear()
         return
+    # Compare with current clipboard to avoid duplication
+    # if isinstance(data, str):
+    #     print("Firebase sent plain string...................................................")
+    #     current_text = ClipboardManager.get_text()
+    #     if current_text == data:
+    #         print("Firebase text matches clipboard, skipping update.")
+    #         return
+    #     ClipboardManager.set_text(data)
+    #     return
     if isinstance(data, dict) and data.get("type") == "text":
         current_text = ClipboardManager.get_text()
         if current_text == data["data"]:
             print("Firebase text matches clipboard, skipping update.")
             return
         ClipboardManager.set_text(data["data"])
-    # Image sync removed
-    # elif isinstance(data, dict) and data.get("type") == "image":
-    #     try:
-    #         img_b64 = data["data"]
-    #         img_bytes = base64.b64decode(img_b64)
-    #         img = Image.open(io.BytesIO(img_bytes))
-    #         img.load()
-    #         # Compare image hashes
-    #         current_image = ClipboardManager.get_image()
-    #         if current_image:
-    #             buf1 = io.BytesIO()
-    #             current_image.save(buf1, format="PNG")
-    #             current_hash = hashlib.md5(buf1.getvalue()).hexdigest()
-    #             buf2 = io.BytesIO()
-    #             img.save(buf2, format="PNG")
-    #             new_hash = hashlib.md5(buf2.getvalue()).hexdigest()
-    #             if current_hash == new_hash:
-    #                 print("Firebase image matches clipboard, skipping update.")
-    #                 return
-    #         ClipboardManager.set_image(img)
-    #         print("Image set to clipboard successfully.")
-    #     except Exception as e:
-    #         print("Error decoding image from Firebase:", e)
+
+    # Handle files
+    elif isinstance(data, dict) and data.get("type") == "files":
+        file_urls = data["data"]
+        local_paths = []
+        for url in file_urls:
+            try:
+                local_path = supabase.download_to_temp(url, TEMP_DIR)
+                local_paths.append(local_path)
+            except Exception as e:
+                print(f"Failed to download {url}: {e}")
+
+        if local_paths:
+            FILE_DOWNLOAD_IGNORE.set()
+            ClipboardManager.set_clipboard_files(local_paths, cut=True)
 
 if __name__ == "__main__":
     manager = ClipboardManager()

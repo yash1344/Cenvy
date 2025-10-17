@@ -1,10 +1,36 @@
+import requests
 from supabase import create_client
 import os
 
-class SupabaseUploader:
+
+class SupabaseManager:
     def __init__(self, url: str, key: str, bucket_name: str):
         self.client = create_client(url, key)
         self.bucket_name = bucket_name
+
+    def download_to_temp(self, url: str, dir: str) -> str:
+        """Download a public file URL to `dir` and return its path."""
+
+        # Safely extract filename portion from URL (ex.: https://uwgqchqhoapudghqyxlb.supabase.co/storage/v1/object/public/clipboard_files/IMG_20251015_161055.jpg)
+        try:
+            filename = os.path.basename(url.split("?")[0])
+            if not filename:
+                filename = "downloaded"
+        except Exception:
+            filename = "downloaded"
+
+        local_path = os.path.join(dir, filename)
+
+        response = requests.get(url, stream=True)
+        response.raise_for_status()
+
+        with open(local_path, "wb") as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
+                    f.write(chunk)
+
+        print(f"Downloaded: {local_path}")
+        return local_path
 
     def upload_file(self, file_path: str):
         """Uploads a file to Supabase Storage and returns its public URL."""

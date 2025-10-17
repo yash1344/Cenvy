@@ -1,9 +1,11 @@
+from pandas import cut
 import win32clipboard
 import win32con
 from PIL import Image
 import io
 import time
 import threading
+import struct
 
 
 MAX_CLIPBOARD_SIZE = 1024 * 1024  # 1 MB
@@ -122,3 +124,23 @@ class ClipboardManager:
         finally:
             win32clipboard.CloseClipboard()
         return None
+    
+    #provided file paths in argument "file_paths" will be Cut or Copied to clipboard
+    @staticmethod
+    def set_clipboard_files(file_paths, cut=False):
+        """Place file paths into clipboard (cut or copy)."""
+        # CF_HDROP requires double-null terminated string
+        files_str = "\0".join(file_paths) + "\0\0"
+        data = files_str.encode("utf-16le")
+
+        win32clipboard.OpenClipboard()
+        win32clipboard.EmptyClipboard()
+        win32clipboard.SetClipboardData(win32con.CF_HDROP, data)
+
+        # Add "Preferred DropEffect" — tells Windows if it's a Cut or Copy
+        drop_effect = struct.pack("I", 2 if cut else 1)  # 2=cut, 1=copy
+        win32clipboard.SetClipboardData(win32clipboard.RegisterClipboardFormat("Preferred DropEffect"), drop_effect)
+
+        win32clipboard.CloseClipboard()
+
+        print(f"Clipboard set with {len(file_paths)} files ({'cut' if cut else 'copy'})")
