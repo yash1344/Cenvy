@@ -5,20 +5,21 @@ import hashlib
 from FirebaseRealtimeDB import FirebaseRealtimeDB
 import threading
 import os
+import supabaseSecrets
 from supabase_uploader import SupabaseUploader
 
 _last_clipboard_hash = None
 
 
 supabase = SupabaseUploader(
-    url="https://uwgqchqhoapudghqyxlb.supabase.co",
-    key="sb_secret_ZfsWQaPxoPWozqxpNM24ZA_Tb_o0ZcX",
+    url=supabaseSecrets.url,
+    key=supabaseSecrets.key,
     bucket_name="clipboard_files"
 )
 
 # Initialize Firebase
 firebase = FirebaseRealtimeDB(
-    cred_path="cenvy-7117b-firebase-adminsdk-fbsvc-80b03bfe86.json",  # <-- Your credentials file
+    cred_path="cenvy-7117b-firebase-adminsdk-fbsvc-13b64f68ec.json",  # <-- Your credentials file
     db_url="https://cenvy-7117b-default-rtdb.firebaseio.com/"  # <-- Your DB URL
 )
 
